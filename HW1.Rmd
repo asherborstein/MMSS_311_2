@@ -1,0 +1,180 @@
+---
+title: "HW1"
+author: "Asher Borstein"
+date: "4/19/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+library(dplyr)
+library(ggplot2)
+library(broom)
+
+#a 
+sick_data$sickornot <- ifelse(sick_data$result == "Positive", 1, 0)
+sick_ols <- lm(sickornot ~ temp + bp, data = sick_data)
+sick_logit <- glm(sickornot ~ temp + bp, data = sick_data, family = binomial(link = "logit"))
+#OLS
+#intercept: -5.213456, temp beta= .062819, bp beta = -.008287
+#LOGIT
+#intercept: -199.327, temp beta= 2.314, bp beta = -.350
+
+#b
+predictionlogit <- plogis(predict(sick_logit, sick_data))
+predictionOLS <- predict(sick_ols, sick_data)
+summary(predictionOLS)
+summary(predictionlogit)
+
+  
+#accuracyOLS 
+sick_data
+  resultOLS <- ifelse(predictionOLS >= .5, 1, 0)
+  correctpredictions <- ifelse(sick_data$sickornot == resultOLS, 1, 0)
+  print(correctpredictions)
+  sum(correctpredictions)/1000
+#96.4% of predictions were correct with OLS
+
+#accuracyLOGIT
+sick_data
+  resultLOGIT <- ifelse(predictionlogit >= .5, 1, 0)
+  correctpredictionsLOGIT <- ifelse(sick_data$sickornot == resultLOGIT, 1, 0)
+  sum(correctpredictionsLOGIT)/1000
+#99.2% of predictions were correct with LOGIT
+
+#c
+#temperature in terms of blood pressure when yhat = .5
+#Let y = B1(bp) + B2 (temp) + B0
+#Then for OLS we have 0.5 = -0.0082865(bp) + 0.0628185(temp) - 5.2134563
+#So, temp = 90.95181 + 0.1319118(bp)
+
+#For logit, we know y = (e^(B1(bp) + B2 (temp) + B0)) / (1+ e^(B1(bp) + B2 (temp) + B0))
+#Thus, we have 0.5 = e^(-0.3499(bp) + 2.3140(temp) -199.3267) / (1 + e^(-0.3499(bp) + 2.3140(temp) -199.3267))
+#Thus, temp = 0.432152 ln( (3.68541)(10^86)  * 2.71828^(0.3499(bp)))
+
+#d
+install.packages("ggplot2")
+library(ggplot2)
+ggplot(sick_data, aes(x=bp, y=temp, color=result)) + geom_point() + geom_abline(intercept = 90.95181, slope = 0.1319118)+ stat_function(fun = function(x)  0.432152 * log((3.68541)*(10^86)  * 2.71828^(0.3499*(x))), color = "green")
+
+#green line is logit line, black line is OLS line 
+
+#2
+#a
+plot(widget_data$y)
+#b
+install.packages("glmnet")
+library(glmnet)
+
+ridge_regression <- glmnet(x= as.matrix(widget_data[, -1]), y = widget_data$y, alpha=0, lambda = .01:100)
+print(ridge_regression)
+
+#c
+install.packages("broom")
+library(broom)
+tidy(ridge_regression)
+ridge_dataframe <- as.data.frame(tidy(ridge_regression))
+ggplot(data = ridge_dataframe, aes(x = ridge_dataframe$lambda, y=ridge_dataframe$estimate)) + geom_line()
+
+#d
+```{r}
+install.packages("glmnet")
+library(glmnet)
+cv.glmnet(x = as.matrix(widget_data[, -1]), y = widget_data$y, alpha=0, lambda = .01:100)
+glmnet <-  cv.glmnet(x = as.matrix(widget_data[, -1]), y = widget_data$y, alpha=0, lambda = .01:100)
+
+summary(glmnet)
+```
+#e repeat for lasso
+glmnet(x = as.matrix(widget_data[, -1]), y = widget_data$y, alpha = 1, lambda = .01:100)
+lasso_regression <- glmnet(x = as.matrix(widget_data[, -1]), y = widget_data$y, alpha = 1, lambda = .01:100) 
+tidy(lasso_regression)
+print(lasso_regression)
+```
+```{r}
+lasso_dataframe<- as.data.frame(tidy(lasso_regression))
+ggplot(data = lasso_dataframe, aes(x=lasso_dataframe$lambda, y=lasso_dataframe$estimate)) + geom_line()
+```
+```{r}
+library(glmnet)
+cv.glmnet(x = as.matrix(widget_data[, -1]), y = widget_data$y, alpha = 1,lambda = .01:100)
+glmnet_lasso <-cv.glmnet(x = as.matrix(widget_data[, -1]), y = widget_data$y, alpha = 1,lambda = .01:100)
+```
+```{r}
+summary(glmnet_lasso)
+
+#differences
+#it can be seen that lasso eliminates different coviariates completely while ridge makes the estimates smaller but does not eliminate any of them completely
+
+#3
+
+#a
+install.packages("e1071")
+install.packages("caret")
+library(e1071)
+library(caret)
+
+
+
+library(readr)
+pol_data <- read.csv("~/Downloads/pol_data.csv")
+View(pol_data)
+
+#b
+set.seed(1)
+split <- 2/3
+training_data <- createDataPartition(pol_data$group, p=split, list=FALSE)
+train <- pol_data[training_data, ]
+test <- pol_data[-training_data, ]
+
+#c
+NB <- naiveBayes(group ~ pol_margin + col_degree + house_income, data=pol_data, laplace = 0,train)
+print(NB)
+SVM<- svm(train$group ~ . , data=train)
+print(SVM)
+
+#d
+predNB <- predict(NB, test)
+summary(predNB)
+
+predSVM <- predict(SVM, test)
+summary(predSVM)
+
+#e
+print(predSVM)
+print(test)
+
+table(test$group, predSVM)
+table(test$group, predNB)
+
+
+correctpredictionsNB <- ifelse(test$group == predNB, 1, 0)
+sum(correctpredictionsNB)
+print(sum(correctpredictionsNB)/100)
+
+correctpredictionsSVM <- ifelse(test$group == predSVM, 1, 0)
+sum(correctpredictionsSVM)
+print(sum(correctpredictionsSVM)/100)
+
